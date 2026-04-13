@@ -25,6 +25,27 @@ export default function DashboardPage() {
     hanwha: MarketData | null;
   }>({ kospi: null, kosdaq: null, hanwha: null })
 
+  // --- 새로 추가된 프로필 관리 상태 ---
+  const [nickname, setNickname] = useState('사용자')
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
+  const [editNickname, setEditNickname] = useState('')
+  const [editPassword, setEditPassword] = useState('')
+  const [updateMessage, setUpdateMessage] = useState('')
+  const [isUpdating, setIsUpdating] = useState(false)
+
+  // 0. 사용자 정보(닉네임) 불러오기
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        // Supabase는 커스텀 데이터를 user_metadata에 저장합니다.
+        const storedNickname = user.user_metadata?.nickname || user.email?.split('@')[0] || '사용자'
+        setNickname(storedNickname)
+      }
+    }
+    fetchUser()
+  }, [])
+
   // 1. 시간 업데이트 설정
   useEffect(() => {
     const updateTime = () => {
@@ -53,8 +74,7 @@ export default function DashboardPage() {
       }
     }
     
-    fetchMarketData() // 마운트 시 즉시 호출
-    // 필요하다면 아래 주석을 풀어서 1분마다 자동 갱신되게 할 수 있습니다.
+    fetchMarketData() 
     const marketTimer = setInterval(fetchMarketData, 30000)
     return () => clearInterval(marketTimer)
   }, [])
@@ -64,7 +84,51 @@ export default function DashboardPage() {
     router.push('/')
   }
 
-  // 지수 컴포넌트 렌더링을 돕는 유틸리티 함수
+  // --- 프로필 업데이트 함수 ---
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsUpdating(true)
+    setUpdateMessage('')
+
+    try {
+      const updates: any = {}
+      
+      // 닉네임이 변경되었을 때만 업데이트 데이터에 포함
+      if (editNickname && editNickname !== nickname) {
+        updates.data = { nickname: editNickname } // user_metadata에 저장됨
+      }
+      // 비밀번호가 입력되었을 때만 업데이트 데이터에 포함
+      if (editPassword) {
+        updates.password = editPassword
+      }
+
+      if (Object.keys(updates).length === 0) {
+        setUpdateMessage('변경할 내용이 없습니다.')
+        setIsUpdating(false)
+        return
+      }
+
+      const { error } = await supabase.auth.updateUser(updates)
+
+      if (error) throw error
+
+      setUpdateMessage('성공적으로 변경되었습니다.')
+      if (updates.data?.nickname) setNickname(editNickname)
+      setEditPassword('') 
+      
+      // 1.5초 후 팝업 닫기
+      setTimeout(() => {
+        setIsProfileModalOpen(false)
+        setUpdateMessage('')
+      }, 1500)
+
+    } catch (error: any) {
+      setUpdateMessage(`오류 발생: ${error.message}`)
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   const renderMarketWidget = (title: string, data: MarketData | null, unit: string = '', colSpanClass: string) => {
     if (!data) {
       return (
@@ -75,10 +139,8 @@ export default function DashboardPage() {
         </div>
       );
     }
-
     const isUp = data.direction === '2';
     const isDown = data.direction === '5';
-    // 2: 상승(빨강), 5: 하락(파랑), 3: 보합(회색)
     const colorClass = isUp ? 'text-[#ff4b4b]' : isDown ? 'text-[#007bff]' : 'text-gray-500';
     const arrow = isUp ? '▲' : isDown ? '▼' : '-';
 
@@ -100,7 +162,6 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-[#f9fafb] flex flex-col md:flex-row relative">
       
-      {/* 1. 모바일 전용 상단 헤더 */}
       <div className="md:hidden flex items-center justify-between bg-white px-6 py-4 border-b border-gray-200 relative z-20">
         <h1 className="font-anchangho text-2xl text-[#ea580c]">FilterWise</h1>
         <button 
@@ -111,27 +172,24 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* 2. 좌측 사이드바 메뉴 */}
       <aside className={`
         ${isMobileMenuOpen ? 'absolute top-[69px] left-0 w-full z-50 shadow-xl' : 'hidden'} 
         md:static md:flex flex-col md:w-64 md:h-screen md:border-r border-gray-200 bg-white p-6 shrink-0 transition-all
       `}>
         <h1 className="hidden md:block font-anchangho text-3xl text-[#ea580c] mb-10">FilterWise</h1>
         <nav className="flex-1 space-y-2">
-          <a href="#" className="block px-4 py-3 rounded-xl bg-orange-50 text-[#ea580c] font-bold transition-colors">대시보드 홈</a>
+          <a href="/dashboard" className="block px-4 py-3 rounded-xl bg-orange-50 text-[#ea580c] font-bold transition-colors">대시보드 홈</a>
+          <a href="/dashboard/board" className="block px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">자유 게시판</a>
           <a href="#" className="block px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">경쟁사 비교 (XBRL)</a>
-          <a href="#" className="block px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">시장 정보 분석</a>
-          <a href="#" className="block px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">한화투자증권 정보</a>
+          <a href="/dashboard/market" className="block px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">시장 정보 분석</a>
         </nav>
         <button onClick={handleLogout} className="mt-8 md:mt-auto px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-800 text-left transition-colors">
           로그아웃
         </button>
       </aside>
 
-      {/* 3. 우측 메인 콘텐츠 영역 */}
       <main className="flex-1 p-6 md:p-10 relative z-10">
         
-        {/* 헤더 */}
         <header className="mb-8 flex flex-col md:flex-row md:justify-between md:items-end gap-2">
           <div>
             <h2 className="text-xl md:text-2xl font-bold text-gray-800">대시보드 홈</h2>
@@ -139,15 +197,20 @@ export default function DashboardPage() {
               한화투자증권 디지털 혁신 AI 경진대회
             </p>
           </div>
-          <div className="hidden md:block text-sm text-gray-500 font-medium bg-white px-4 py-2 rounded-full shadow-sm border border-gray-100">
-            환영합니다!
-          </div>
+          {/* 클릭 가능한 닉네임 버튼으로 수정 */}
+          <button 
+            onClick={() => {
+              setEditNickname(nickname)
+              setUpdateMessage('')
+              setIsProfileModalOpen(true)
+            }}
+            className="hidden md:block text-sm text-gray-700 font-bold bg-white px-4 py-2 rounded-full shadow-sm border border-gray-100 hover:bg-orange-50 hover:text-orange-600 transition-colors cursor-pointer"
+          >
+            {nickname}님 환영합니다!
+          </button>
         </header>
 
-        {/* --- 상단 지수 및 데이터 박스 그리드 --- */}
         <div className="mb-10 grid grid-cols-2 lg:grid-cols-4 gap-4">
-          
-          {/* 시간 박스 */}
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center hover:shadow-md transition-shadow col-span-2 lg:col-span-1 text-left relative">
             <span className="absolute top-5 right-5 text-xs text-orange-500 font-semibold bg-orange-50 px-3 py-1 rounded-full shadow-sm border border-orange-100">Now</span>
             <div className="flex items-center gap-2 mb-2">
@@ -161,14 +224,11 @@ export default function DashboardPage() {
             </span>
           </div>
 
-          {/* 실시간 시장 위젯 렌더링 */}
           {renderMarketWidget('KOSPI', marketInfo.kospi, '', 'col-span-1 lg:col-span-1')}
           {renderMarketWidget('KOSDAQ', marketInfo.kosdaq, '', 'col-span-1 lg:col-span-1')}
           {renderMarketWidget('한화투자증권', marketInfo.hanwha, '원', 'col-span-2 lg:col-span-1')}
-
         </div>
         
-        {/* 요약 카드 그리드 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 text-left">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer">
             <h3 className="text-lg font-bold text-gray-800 mb-2">XBRL 분석 요약</h3>
@@ -184,6 +244,62 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
+
+      {/* --- 프로필 수정 모달(팝업) 영역 --- */}
+      {isProfileModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 w-[90%] max-w-sm shadow-2xl relative">
+            <button 
+              onClick={() => setIsProfileModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 focus:outline-none"
+            >
+              <XMarkIcon className="h-6 w-6" />
+            </button>
+            
+            <h2 className="text-xl font-bold text-gray-800 mb-6">회원 정보 수정</h2>
+            
+            <form onSubmit={handleProfileUpdate} className="flex flex-col gap-4 text-left">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">닉네임</label>
+                <input 
+                  type="text" 
+                  value={editNickname}
+                  onChange={(e) => setEditNickname(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all text-sm"
+                  placeholder="새 닉네임 입력"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">새 비밀번호</label>
+                <input 
+                  type="password" 
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all text-sm"
+                  placeholder="변경할 비밀번호 입력 (선택)"
+                />
+                <p className="text-xs text-gray-400 mt-1.5">비밀번호를 변경하지 않으려면 비워두세요.</p>
+              </div>
+
+              {updateMessage && (
+                <div className={`text-sm font-medium mt-1 ${updateMessage.includes('성공') ? 'text-green-600' : 'text-red-600'}`}>
+                  {updateMessage}
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                disabled={isUpdating}
+                className="mt-4 w-full bg-[#ea580c] hover:bg-orange-700 text-white font-bold py-2.5 rounded-lg transition-colors disabled:bg-gray-400 text-sm"
+              >
+                {isUpdating ? '저장 중...' : '저장하기'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
