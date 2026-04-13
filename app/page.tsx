@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { UserIcon, LockClosedIcon } from '@heroicons/react/24/outline'
 import { supabase } from '../utils/supabase/client'
+//주석확인
+
 
 export default function LoginPage() {
   const router = useRouter()

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "FilterWise",
-  description: "by hisc",
+  description: "by hisccm",
 };
 
 export default function RootLayout({

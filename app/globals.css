@@ -5,7 +5,8 @@
     font-family: 'KccAnchangho';
     src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2402_1@1.0/KCC-Ahnchangho.woff2') format('woff2');
     font-weight: normal;
-    font-display: swap;
+    /* font-display: swap; 대신 block을 사용합니다 */
+    font-display: block;
 }
 
 .font-anchangho {
